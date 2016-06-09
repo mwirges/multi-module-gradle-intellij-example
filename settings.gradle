@@ -1,0 +1,18 @@
+import java.nio.file.Files
+import java.nio.file.Paths
+
+gradle.ext.moduleLinkerIgnoreVersions = true
+
+def ignoreProjectNames = []
+
+Paths.get(".").eachFile { path ->
+    if (!Files.isDirectory(path)) {
+        return
+    }
+    def subproject = path.normalize().toString()
+    println path.toString()
+    if (Files.exists(Paths.get(subproject, "build.gradle")) && !ignoreProjectNames.contains(subproject)) {
+        println "adding dependency on project ${subproject}"
+        include subproject
+    }
+}

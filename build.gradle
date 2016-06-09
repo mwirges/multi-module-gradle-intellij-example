@@ -1,0 +1,46 @@
+evaluationDependsOnChildren()
+
+def subprojectsByName = subprojects.collectEntries { it -> [it.name, it] }
+
+def projectGAV = subprojects.collectEntries {
+    def name = it.name
+    def subSettings = new File("${it.name}/settings.gradle")
+    try {
+        subSettings.eachLine { line ->
+            if (line =~ /^rootProject\.name/) {
+                name = line.split(/=/)[1].replaceAll(/['"]/, '').trim()
+                throw new RuntimeException()
+            }
+        }
+        // dirty dirty hack hack
+    } catch (RuntimeException e) { }
+
+    def key = "${it.group}:${name}"
+    if (!gradle.moduleLinkerIgnoreVersions) {
+        key = "${key}:${it.version}"
+    }
+    [ key, it.name ]
+}
+
+
+subprojects.each { p ->
+    p.configurations.each { c ->
+        def cDeps = c.allDependencies.collect( { d->
+            if (!gradle.moduleLinkerIgnoreVersions) {
+                "${d.group}:${d.name}:${d.version}"
+            } else {
+                "${d.group}:${d.name}"
+            }
+        })
+        c.resolutionStrategy {
+            dependencySubstitution {
+                projectGAV.each {
+                    if (cDeps.contains(it.key)) {
+                        substitute module(it.key) with project(":${it.value}")
+                        println ":${p.name}[${c.name}] -> substituting module ${it.key} with project :${it.value}"
+                    }
+                }
+            }
+        }
+  }
+}
